@@ -102,5 +102,4 @@ docker stack deploy -c swarm-stack.yml prod_180625
 My own stack visualizer is live (or not) at [swarm.rongyi.io](https://swarm.rongyi.io)
 
 ## License
-The code and configuration in this repo is currently UNLICENSED.
-Copyright (c) LER0ever. All Rights Reserved.
+The code and configuration in this repo is open source under the terms of Apache 2.0
