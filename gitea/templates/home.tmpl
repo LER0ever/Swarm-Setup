@@ -1,0 +1,51 @@
+{{template "base/head" .}}
+<div class="home">
+	<div class="ui stackable middle very relaxed page grid">
+		<div class="sixteen wide center aligned centered column">
+			<div>
+				<img class="logo" src="{{AppSubUrl}}/img/LER0ever-lg.png" />
+			</div>
+			<div class="hero">
+				<h1 class="ui icon header title">L.E.R Code</h1>
+				<h2>Personal Git Hosting with Gitea</h2>
+			</div>
+		</div>
+	</div>
+		<div class="ui stackable middle very relaxed page grid">
+			<div class="eight wide center column">
+				<h1 class="hero ui icon header">
+                  <a href="/LER0ever/Projects"><i class="octicon octicon-rocket"></i> What is this site?</a>
+				</h1>
+				<p class="large">
+                  Here is my personal code repositories hosted on Gitea. Please see a <a href="https://code.rongyi.io/LER0ever/Projects">detailed introductions and sitemap here</a>
+				</p>
+			</div>
+			<div class="eight wide center column">
+				<h1 class="hero ui icon header">
+					<i class="octicon octicon-flame"></i> Why Self-Host?
+				</h1>
+				<p class="large">
+                  Because Micro$oft just acquired Github, and that Gitlab runs on Micro$oft Azure.
+				</p>
+			</div>
+		</div>
+		<div class="ui stackable middle very relaxed page grid">
+			<div class="eight wide center column">
+				<h1 class="hero ui icon header">
+					<i class="octicon octicon-device-desktop"></i> Why Gitea?
+				</h1>
+				<p class="large">
+					Gitea runs anywhere <a target="_blank" rel="noopener" href="http://golang.org/">Go</a> can compile for: Windows, macOS, Linux, ARM, etc.
+				</p>
+			</div>
+			<div class="eight wide center column">
+				<h1 class="hero ui icon header">
+					<i class="octicon octicon-code"></i> Open Source
+				</h1>
+				<p class="large">
+					I believe in Open Source, but not in GNU. Most of my project is licensed under Apache 2.0, some of them are dual-licensed. I only open source garbage under GPL.
+				</p>
+			</div>
+		</div>
+</div>
+{{template "base/footer" .}}

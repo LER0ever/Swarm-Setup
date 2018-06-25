@@ -1,0 +1,253 @@
+version: "3"
+networks:
+  gitea-net:
+    external: true
+  # mastodon-net:
+  #   external: true
+  proxy:
+    external: true
+
+services:
+################ Dynamic Reverse Proxy ################
+  proxy:
+    image: vfarcic/docker-flow-proxy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /data/rongyi-io.pem:/certs/rongyi-io.pem
+    networks:
+      - proxy
+    environment:
+      - LISTENER_ADDRESS=swarm-listener
+      - MODE=swarm
+      - DEBUG=true
+    deploy:
+      placement:
+        constraints:
+          - node.labels.access == public
+      replicas: 2
+
+  swarm-listener:
+    image: vfarcic/docker-flow-swarm-listener
+    networks:
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DF_NOTIFY_CREATE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/reconfigure
+      - DF_NOTIFY_REMOVE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/remove
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+################ Gitea hosting ################
+  gitea:
+    image: gitea/gitea:latest
+    ports:
+      - "3000"
+      - "233"
+    volumes:
+      - /data:/data
+      - ./gitea/gitea-app.ini:/data/gitea/conf/app.ini
+      - ./gitea/templates:/data/gitea/templates
+      - ./gitea/imgs:/data/gitea/public/img
+    networks:
+      - proxy
+      - gitea-net
+    deploy:
+      labels:
+        - com.df.notify=true
+        - com.df.distribute=true
+        - com.df.httpsOnly=true
+        - com.df.serviceDomain.1=code.rongyi.io,git.rongyi.io
+        - com.df.port.1=3000
+        - com.df.serviceDomain.2=code.rongyi.io,git.rongyi.io
+        - com.df.port.2=233
+        - com.df.srcPort.2=233
+      placement:
+        constraints:
+          - node.labels.gitea == true
+
+################ Kanboard todo board ################
+  kanboard:
+    image: kanboard/kanboard:v1.2.4
+    ports:
+      - "8636:80"
+    volumes:
+      - /data/kanboard/data:/var/www/app/data
+      - /data/kanboard/plugins:/var/www/app/plugins
+    networks:
+      - proxy
+    deploy:
+      labels:
+        - com.df.notify=true
+        - com.df.distribute=true
+        - com.df.httpsOnly=true
+        - com.df.serviceDomain.1=board.rongyi.io
+        - com.df.port.1=80
+      placement:
+        constraints:
+          - node.labels.kanboard == true
+
+################ Drone CI Service ################
+  drone:
+    image: drone/drone
+    depends_on:
+      - gitea
+    networks:
+      - gitea-net
+      - proxy
+    volumes:
+      - /data/drone:/var/lib/drone/
+    environment:
+      - DRONE_OPEN=true
+      - DRONE_HOST=https://drone.rongyi.io
+      - DRONE_SECRET={secret}
+      - DRONE_GITEA=true
+      - DRONE_GITEA_URL=https://code.rongyi.io
+      - DRONE_NETWORK=gitea-net
+      - DRONE_ADMIN=LER0ever
+      - DRONE_GITEA_SKIP_VERIFY=true
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == LER0ever-Samsung
+      labels:
+        - com.df.notify=true
+        - com.df.distribute=true
+        - com.df.httpsOnly=true
+        - com.df.serviceDomain.1=drone.rongyi.io
+        - com.df.port.1=8000
+  drone-agent:
+    image: drone/agent
+    depends_on:
+      - drone
+    networks:
+      - gitea-net
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DRONE_SERVER=drone:9000
+      - DRONE_SECRET={secret}
+      - DRONE_MAX_PROCS=3
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.hostname == LER0ever-Samsung
+
+################ Verdaccio NPM Registry ################
+  verdaccio:
+    image: verdaccio/verdaccio
+    networks:
+      - proxy
+    volumes:
+      - /data/verdaccio/conf:/verdaccio/conf
+      - /data/verdaccio/storage:/verdaccio/storage
+    ports:
+      - 4873:4873
+    deploy:
+      placement:
+        constraints:
+          - node.labels.verdaccio == true
+      labels:
+        - com.df.notify=true
+        - com.df.distribute=true
+        - com.df.httpsOnly=true
+        - com.df.serviceDomain.1=npm.rongyi.io
+        - com.df.port.1=4873
+
+################ Mastodon Social ################
+  # mastodon-db:
+  #   image: postgres:9.6-alpine
+  #   networks:
+  #     - mastodon-net
+  #   volumes:
+  #     - /data/mastodon/postgres:/var/lib/postgresql/data
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - node.labels.mastodon == true
+  # mastodon-redis:
+  #   image: redis:4.0-alpine
+  #   networks:
+  #     - mastodon-net
+  #   volumes:
+  #     - /data/mastodon/redis:/data
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - node.labels.mastodon == true
+  # mastodon:
+  #   image: wonderfall/mastodon
+  #   env_file: ./mastodon/env.production
+  #   volumes:
+  #     - /data/mastodon/data:/mastodon/public/system
+  #     - /data/mastodon/logs:/mastodon/log
+  #   networks:
+  #     - proxy
+  #     - mastodon-net
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - mastodon-db
+  #     - mastodon-redis
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - node.labels.mastodon == true
+  #     labels:
+  #       - com.df.notify=true
+  #       - com.df.distribute=true
+  #       - com.df.httpsOnly=true
+  #       - com.df.serviceDomain.1=sn.rongyi.io
+  #       - com.df.port.1=3000
+
+################ Shadowsocks for GFW ################
+  shadowsocks:
+    image: shadowsocks/shadowsocks-libev
+    networks:
+      - proxy
+    ports:
+      - 8388:8388
+      - 8388:8388/udp
+    environment:
+      - PASSWORD={secret}
+      - METHOD=chacha20-ietf-poly1305
+    deploy:
+      placement:
+        constraints:
+          - node.labels.shadowsocks == true
+      labels:
+        - com.df.serviceDomain.1=ss.rongyi.io
+        - com.df.port.1=8388
+        - com.df.srcPort.1=8388
+
+################ BT Daemon ################
+  transmission-daemon:
+    image: linuxserver/transmission
+    networks:
+      - proxy
+    ports:
+      - 9091:9091
+      - 51413:51413
+      - 51413:51413/udp
+    volumes:
+      - /data/TD/Downloads:/downloads
+      - /data/TD/config:/config
+    deploy:
+      placement:
+        constraints:
+          - node.labels.transmission == true
+  httpd:
+    image: httpd:2.4
+    ports:
+      - 8088:80
+    volumes:
+      - /data/TD/Downloads:/usr/local/apache2/htdocs/
+    deploy:
+      placement:
+        constraints:
+          - node.labels.transmission == true
